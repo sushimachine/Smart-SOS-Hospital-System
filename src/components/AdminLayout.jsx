@@ -85,7 +85,7 @@ export default function AdminLayout() {
           )}
 
           <NavItem to="/admin/add" icon={PackagePlus} label="Add Stock" />
-          <NavItem to="/porter" icon={Truck} label="Logistics View" />
+          <NavItem to="/admin/logistics" icon={Truck} label="Logistics View" />
         </div>
 
         {isSidebarOpen && (

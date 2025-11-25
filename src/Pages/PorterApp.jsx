@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Truck, MapPin, CheckCircle, Package, ArrowRight, Play } from 'lucide-react';
+import { Truck, CheckCircle, Package, ArrowRight, Play, Clock, User } from 'lucide-react';
 
-export default function PorterApp() {
+function PorterApp() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // CHECK ROLE: Is the viewer actually a porter?
+  const isPorter = user?.email?.includes('porter');
 
   useEffect(() => {
     fetchTasks();
     setupRealtimeSubscription();
   }, []);
 
-  // Fetch 'pending' AND 'in_transit' tasks
   const fetchTasks = async () => {
     try {
       const { data, error } = await supabase
@@ -23,7 +25,7 @@ export default function PorterApp() {
           from:locations!from_location_id(name),
           to:locations!to_location_id(name)
         `)
-        .in('status', ['pending', 'in_transit']) // Fetch both active states
+        .in('status', ['pending', 'in_transit'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -40,15 +42,13 @@ export default function PorterApp() {
       .channel('porter-tasks')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'transactions' }, // Listen to ALL changes (updates too)
+        { event: '*', schema: 'public', table: 'transactions' },
         async (payload) => {
-          // If it's an UPDATE (status change), refresh local state logic
           if (payload.eventType === 'UPDATE' && payload.new.status === 'delivered') {
             setTasks((prev) => prev.filter((t) => t.id !== payload.new.id));
             return;
           }
 
-          // If INSERT or relevant UPDATE, fetch fresh data
           const { data } = await supabase
             .from('transactions')
             .select(`
@@ -60,14 +60,16 @@ export default function PorterApp() {
             .single();
 
           if (data) {
-             // If it's already in list, update it (e.g. pending -> in_transit)
              setTasks((prev) => {
                 const exists = prev.find(t => t.id === data.id);
                 if (exists) return prev.map(t => t.id === data.id ? data : t);
                 return [data, ...prev];
              });
              
-             if (payload.eventType === 'INSERT') alert(`🚨 NEW TASK: Move ${data.drug_name}!`);
+             // Only alert if it's a new task AND user is a porter
+             if (payload.eventType === 'INSERT' && isPorter) {
+                alert(`🚨 NEW TASK: Move ${data.drug_name}!`);
+             }
           }
         }
       )
@@ -78,38 +80,26 @@ export default function PorterApp() {
     };
   };
 
-  // STEP 1: PICK UP (Pending -> In Transit)
   const startDelivery = async (task) => {
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ status: 'in_transit' })
-        .eq('id', task.id);
-
-      if (error) throw error;
-      // UI update happens automatically via Realtime, but we optimistically update for speed
+      await supabase.from('transactions').update({ status: 'in_transit' }).eq('id', task.id);
+      // Optimistic update
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'in_transit' } : t));
     } catch (error) {
       alert("Error starting delivery");
     }
   };
 
-  // STEP 2: COMPLETE (In Transit -> Delivered)
   const completeDelivery = async (task) => {
-    const confirm = window.confirm(`Arrived at ${task.to?.name}? Confirm delivery.`);
-    if (!confirm) return;
+    if (!window.confirm(`Confirm delivery of ${task.drug_name}?`)) return;
 
     try {
-      // A. Mark Transaction Complete
-      await supabase
-        .from('transactions')
-        .update({ 
-          status: 'delivered', 
-          performed_by_user_id: user?.id 
-        })
+      // 1. Mark Delivered
+      await supabase.from('transactions')
+        .update({ status: 'delivered', performed_by_user_id: user?.id })
         .eq('id', task.id);
 
-      // B. Update Inventory (Add stock to destination)
+      // 2. Update Inventory Logic
       const { data: existingStock } = await supabase
         .from('inventory')
         .select('*')
@@ -128,7 +118,6 @@ export default function PorterApp() {
         });
       }
 
-      // Remove from list
       setTasks(prev => prev.filter(t => t.id !== task.id));
 
     } catch (error) {
@@ -137,17 +126,26 @@ export default function PorterApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 font-sans">
       <div className="flex items-center justify-between mb-8 pt-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Truck className="text-blue-500" /> Logistics View
           </h1>
-          <p className="text-slate-400 text-sm">Real-time delivery feed</p>
+          <p className="text-slate-400 text-sm">
+            {isPorter ? 'Real-time delivery feed' : 'Live Tracking Dashboard'}
+          </p>
         </div>
-        <div className="bg-green-900 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-700 animate-pulse">
-          ● ONLINE
-        </div>
+        
+        {isPorter ? (
+          <div className="bg-green-900 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-700 animate-pulse">
+            ● ONLINE (PORTER)
+          </div>
+        ) : (
+          <div className="bg-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-bold border border-slate-700 flex items-center gap-2">
+            <User size={12} /> READ ONLY
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -156,7 +154,7 @@ export default function PorterApp() {
         <div className="flex flex-col items-center justify-center mt-20 opacity-50">
           <CheckCircle size={64} className="text-slate-600 mb-4" />
           <p className="text-xl font-bold">All caught up!</p>
-          <p className="text-sm">Waiting for new requests...</p>
+          <p className="text-sm">No active movements.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -172,7 +170,7 @@ export default function PorterApp() {
                 {/* Header Badge */}
                 <div className={`px-4 py-1 text-xs font-bold text-black uppercase flex justify-between items-center
                   ${isInTransit ? 'bg-blue-500' : 'bg-amber-400'}`}>
-                  <span>{isInTransit ? '🚀 ON THE WAY' : '⚠️ NEW REQUEST'}</span>
+                  <span>{isInTransit ? '🚀 ON THE WAY' : '⚠️ REQUEST PENDING'}</span>
                   <span>{new Date(task.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
 
@@ -197,7 +195,6 @@ export default function PorterApp() {
                       </div>
                     </div>
                     
-                    {/* Arrow Visual */}
                     <div className="flex justify-center -my-2 opacity-30">
                       <ArrowRight className="rotate-90" size={16} />
                     </div>
@@ -213,24 +210,43 @@ export default function PorterApp() {
                   </div>
                 </div>
 
-                {/* THE DYNAMIC BUTTON */}
-                {isInTransit ? (
-                  <button
-                    onClick={() => completeDelivery(task)}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle size={20} />
-                    CONFIRM ARRIVAL (DELIVERED)
-                  </button>
+                {/* --- ROLE BASED BUTTON RENDER --- */}
+                {isPorter ? (
+                  // IF PORTER: Show Action Buttons
+                  isInTransit ? (
+                    <button
+                      onClick={() => completeDelivery(task)}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={20} />
+                      CONFIRM ARRIVAL
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startDelivery(task)}
+                      className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play size={20} fill="black" />
+                      ACCEPT TASK
+                    </button>
+                  )
                 ) : (
-                  <button
-                    onClick={() => startDelivery(task)}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Play size={20} fill="black" />
-                    ACCEPT & START DELIVERY
-                  </button>
+                  // IF NURSE/ADMIN: Show Status Text Only
+                  <div className="w-full bg-slate-900/50 py-4 flex items-center justify-center gap-2 text-slate-400 border-t border-slate-700 font-medium">
+                    {isInTransit ? (
+                      <>
+                        <Truck size={18} className="animate-bounce" />
+                        Porter is moving the stock...
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={18} />
+                        Waiting for Porter to Accept...
+                      </>
+                    )}
+                  </div>
                 )}
+                
               </div>
             );
           })}
@@ -239,3 +255,5 @@ export default function PorterApp() {
     </div>
   );
 }
+
+export default PorterApp

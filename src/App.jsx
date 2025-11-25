@@ -18,6 +18,7 @@ function App() {
           <Route path="/admin" element={<MasterDashboard />} />
           <Route path="/nurse" element={<NurseDashboard />} />
           <Route path="/admin/add" element={<AddInventory />} /> 
+          <Route path="/admin/logistics" element={<PorterApp />} />
         </Route>
 
         <Route path="/porter" element={<PorterApp />} />

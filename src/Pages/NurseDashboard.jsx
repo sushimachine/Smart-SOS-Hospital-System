@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, CheckCircle, Package, Activity, Plus, Search, X, Server } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Package, Activity, Plus, Search, X, Loader2, ArrowRight } from 'lucide-react';
 
 function NurseDashboard() {
   const { user } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Modal & Request State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [requestDrug, setRequestDrug] = useState('');
-  const [algoLogs, setAlgoLogs] = useState([]); 
-  const [isSearching, setIsSearching] = useState(false);
+  const [requestQty, setRequestQty] = useState(10); // Default qty
+  
+  // The "Visual" Process State (0 = Form, 1 = Searching, 2 = Found/Done, 3 = Error)
+  const [processStep, setProcessStep] = useState(0); 
+  const [algoResult, setAlgoResult] = useState(null); // Stores where we found it
 
-  const MY_WARD_ID = 2; 
+  const MY_WARD_ID = 2; // Hardcoded ICU
 
   useEffect(() => {
     fetchInventory();
@@ -33,64 +37,71 @@ function NurseDashboard() {
     }
   };
 
-  const runSmartAlgorithm = async () => {
-    if (!requestDrug) return;
-    setIsSearching(true);
-    setAlgoLogs([]); 
+  const resetModal = () => {
+    setIsModalOpen(false);
+    setProcessStep(0);
+    setRequestDrug('');
+    setRequestQty(10);
+    setAlgoResult(null);
+  };
 
-    const addLog = (text, type = 'info') => {
-      setAlgoLogs(prev => [...prev, { text, type }]);
-    };
+  // --- THE PROFESSIONAL ALGORITHM ---
+  const runSmartAlgorithm = async () => {
+    if (!requestDrug || !requestQty) return;
+    setProcessStep(1); // Start "Scanning" animation
 
     try {
-      addLog("📡 Connecting to Hospital Grid...", 'info');
-      await new Promise(r => setTimeout(r, 600)); 
+      // Step 1: Artificial Delay for "Scanning" visual
+      await new Promise(r => setTimeout(r, 800));
 
+      // Query Global Stock
       const { data: globalStock } = await supabase
         .from('inventory')
         .select(`*, locations(name, type)`)
         .eq('drug_name', requestDrug)
-        .gt('quantity', 0); 
+        .gt('quantity', 0);
+
+      // Step 2: Artificial Delay for "Analyzing" visual
+      await new Promise(r => setTimeout(r, 800));
 
       if (!globalStock || globalStock.length === 0) {
-        addLog("❌ CRITICAL: Drug not found in entire hospital network.", 'error');
-        setIsSearching(false);
+        setAlgoResult({ error: "Drug unavailable in entire hospital network." });
+        setProcessStep(3); // Error State
         return;
       }
 
-      addLog("🏭 Checking Central Warehouse...", 'info');
-      await new Promise(r => setTimeout(r, 600));
-
-      const warehouse = globalStock.find(item => item.locations.type === 'warehouse');
+      // Logic: Warehouse First -> Then Surplus Wards
       let bestSource = null;
+      let sourceName = '';
+      let sourceType = '';
+
+      const warehouse = globalStock.find(item => item.locations.type === 'warehouse' && item.quantity >= requestQty);
 
       if (warehouse) {
-        addLog("✅ Stock found in Warehouse. Allocating...", 'success');
         bestSource = warehouse;
+        sourceName = warehouse.locations.name;
+        sourceType = 'Central Supply';
       } else {
-        addLog("⚠️ Warehouse Empty! Initiating Peer-to-Peer Scan...", 'warning');
-        await new Promise(r => setTimeout(r, 800));
-
+        // Warehouse empty or insufficient? Find richest ward
         const richestWard = globalStock
-          .filter(item => item.location_id !== MY_WARD_ID)
+          .filter(item => item.location_id !== MY_WARD_ID && item.quantity >= requestQty)
           .sort((a, b) => b.quantity - a.quantity)[0];
 
         if (richestWard) {
-          addLog(`🚑 ALGORITHM MATCH: Stealing stock from ${richestWard.locations.name} (Qty: ${richestWard.quantity})`, 'success');
           bestSource = richestWard;
+          sourceName = richestWard.locations.name;
+          sourceType = 'Surplus Rebalance';
         } else {
-          addLog("❌ No surplus stock available in other wards.", 'error');
-          setIsSearching(false);
+          setAlgoResult({ error: `Not enough stock found. Max available: ${globalStock.reduce((a,b)=>a+b.quantity,0)}` });
+          setProcessStep(3);
           return;
         }
       }
 
-      await new Promise(r => setTimeout(r, 600));
-      addLog("🚚 Dispatching Porter Request...", 'info');
-
+      // Step 3: Execute
       const { error } = await supabase.from('transactions').insert({
         drug_name: requestDrug,
-        qty: 20, 
+        qty: requestQty,
         from_location_id: bestSource.location_id,
         to_location_id: MY_WARD_ID,
         status: 'pending',
@@ -99,20 +110,21 @@ function NurseDashboard() {
 
       if (error) throw error;
 
-      addLog("✨ SUCCESS: Request Queued in Real-time System.", 'done');
-      
-      fetchInventory();
+      // Success State
+      setAlgoResult({ source: sourceName, type: sourceType });
+      setProcessStep(2); // Done State
+      fetchInventory(); // Refresh table behind modal
 
     } catch (error) {
-      addLog("Error executing algorithm.", 'error');
       console.error(error);
-    } finally {
-      setIsSearching(false);
+      setAlgoResult({ error: "System Error." });
+      setProcessStep(3);
     }
   };
 
   return (
     <div className="space-y-6 relative">
+      {/* Header */}
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">ICU Ward Inventory</h2>
@@ -128,6 +140,7 @@ function NurseDashboard() {
         </button>
       </div>
 
+      {/* Main Inventory Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
@@ -142,7 +155,7 @@ function NurseDashboard() {
             {loading ? (
                <tr><td colSpan="4" className="p-8 text-center text-slate-400">Loading...</td></tr>
             ) : inventory.length === 0 ? (
-               <tr><td colSpan="4" className="p-8 text-center text-slate-400">No stock recorded. Click "New Request" to order.</td></tr>
+               <tr><td colSpan="4" className="p-8 text-center text-slate-400">No stock recorded.</td></tr>
             ) : inventory.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50">
                   <td className="p-4 font-bold text-slate-800">{item.drug_name}</td>
@@ -173,77 +186,125 @@ function NurseDashboard() {
         </table>
       </div>
 
+      {/* --- PROFESSIONAL REQUEST MODAL --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             
-            <div className="bg-slate-900 p-6 flex justify-between items-center">
-              <div className="flex items-center gap-2 text-white">
-                <Activity className="text-blue-400" />
-                <h3 className="font-bold text-lg">Smart Supply Request</h3>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
+            {/* Modal Header */}
+            <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-slate-800">Request Stock</h3>
+              <button onClick={resetModal} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {!isSearching && algoLogs.length === 0 && (
-                <>
+            {/* Modal Body */}
+            <div className="p-6">
+              
+              {/* STEP 0: THE FORM */}
+              {processStep === 0 && (
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Select Medicine Needed</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Drug Name</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                      <Search className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input 
                         type="text" 
                         value={requestDrug}
                         onChange={(e) => setRequestDrug(e.target.value)}
-                        placeholder="e.g. Adrenaline, Morphine..." 
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                        placeholder="e.g. Adrenaline" 
+                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                        autoFocus
                       />
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      System will automatically scan all wards for availability.
-                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Quantity Needed</label>
+                    <input 
+                      type="number" 
+                      value={requestQty}
+                      onChange={(e) => setRequestQty(parseInt(e.target.value))}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                    />
                   </div>
 
                   <button 
                     onClick={runSmartAlgorithm}
-                    disabled={!requestDrug}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all"
+                    disabled={!requestDrug || !requestQty}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 mt-4 transition-all shadow-lg shadow-blue-200"
                   >
-                    <Server size={20} />
-                    Run Auto-Allocation Algorithm
+                    Locate & Request Stock <ArrowRight size={18} />
                   </button>
-                </>
+                </div>
               )}
 
-              {(isSearching || algoLogs.length > 0) && (
-                <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm h-64 overflow-y-auto border border-slate-700 shadow-inner">
-                  {algoLogs.map((log, i) => (
-                    <div key={i} className={`mb-2 ${
-                      log.type === 'error' ? 'text-red-400' : 
-                      log.type === 'success' ? 'text-green-400' : 
-                      log.type === 'warning' ? 'text-amber-400' : 
-                      log.type === 'done' ? 'text-blue-400 font-bold' :
-                      'text-slate-300'
-                    }`}>
-                      <span className="opacity-50 mr-2">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
-                      {log.text}
-                    </div>
-                  ))}
-                  {isSearching && (
-                    <div className="text-blue-500 animate-pulse">_ Processing request logic...</div>
-                  )}
+              {/* STEP 1: PROCESSING VISUAL (The "Smart" part) */}
+              {processStep === 1 && (
+                <div className="py-8 text-center space-y-4">
+                  <div className="relative w-16 h-16 mx-auto">
+                    <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-slate-800">Optimizing Supply Chain...</h4>
+                    <p className="text-sm text-slate-500">Scanning warehouse and surplus wards</p>
+                  </div>
                   
-                  {algoLogs.some(l => l.type === 'done') && (
-                     <button 
-                       onClick={() => setIsModalOpen(false)}
-                       className="mt-4 w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded border border-slate-600"
-                     >
-                       Close Console
-                     </button>
-                  )}
+                  {/* The Checklist Visual */}
+                  <div className="max-w-[200px] mx-auto text-left space-y-2 mt-4 text-sm text-slate-600">
+                    <div className="flex items-center gap-2">
+                       <CheckCircle size={16} className="text-green-500" /> Database Connection
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <Loader2 size={16} className="animate-spin text-blue-500" /> Checking Availability
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: SUCCESS RESULT */}
+              {processStep === 2 && (
+                <div className="py-4 text-center">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                    <CheckCircle size={32} />
+                  </div>
+                  <h4 className="text-xl font-bold text-slate-800">Stock Secured!</h4>
+                  
+                  <div className="bg-slate-50 rounded-lg p-4 mt-4 text-left border border-slate-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-slate-400 uppercase">Source</span>
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">{algoResult?.type}</span>
+                    </div>
+                    <p className="text-lg font-bold text-slate-800">{algoResult?.source}</p>
+                    <p className="text-sm text-slate-500">Porter has been dispatched.</p>
+                  </div>
+
+                  <button 
+                    onClick={resetModal}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl mt-6"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 3: FAILURE */}
+              {processStep === 3 && (
+                <div className="py-4 text-center">
+                  <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <X size={32} />
+                  </div>
+                  <h4 className="text-xl font-bold text-slate-800">Request Failed</h4>
+                  <p className="text-red-600 mt-2 font-medium">{algoResult?.error}</p>
+                  
+                  <button 
+                    onClick={() => setProcessStep(0)}
+                    className="w-full border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mt-6 hover:bg-slate-50"
+                  >
+                    Try Different Amount
+                  </button>
                 </div>
               )}
 
