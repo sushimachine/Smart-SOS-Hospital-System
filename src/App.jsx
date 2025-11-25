@@ -5,12 +5,14 @@ import MasterDashboard from './Pages/MasterDashboard';
 import AddInventory from './Pages/AddInventory';
 import NurseDashboard from './Pages/NurseDashboard';
 import PorterApp from './Pages/PorterApp';
+import Homepage from './Pages/Homepage';
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Homepage />} />
+        <Route path="/login" element={<Login />} />
         
         <Route path="/" element={<AdminLayout />}>
           <Route path="/admin" element={<MasterDashboard />} />
