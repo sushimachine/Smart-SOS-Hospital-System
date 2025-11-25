@@ -44,14 +44,14 @@ export default function AdminLayout() {
         bg-slate-900 flex flex-col border-r border-slate-800 shrink-0 transition-all duration-300 ease-in-out`}
       >
         
-        <div className={`h-16 flex justify-center items-center border-b border-slate-800 transition-all
+        <div className={`h-16 flex items-center border-b border-slate-800 transition-all
           ${isSidebarOpen ? 'px-6 justify-between' : 'justify-center px-0'}`}>
           
           {isSidebarOpen && (
             <div className="flex items-center overflow-hidden whitespace-nowrap">
-              {/* <Activity className="text-blue-500 mr-2 min-w-[20px]" /> */}
+              <Activity className="text-blue-500 mr-2 min-w-[20px]" />
               <h1 className="text-white font-bold text-lg tracking-wide">
-                MENU 
+                Hospital <span className="text-blue-500">OS</span>
               </h1>
             </div>
           )}
