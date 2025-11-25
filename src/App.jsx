@@ -12,15 +12,12 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         
-        {/* All Admin/Nurse Routes share the Sidebar Layout */}
         <Route path="/" element={<AdminLayout />}>
-          {/* The content of these paths will render inside the <Outlet /> */}
           <Route path="/admin" element={<MasterDashboard />} />
           <Route path="/nurse" element={<NurseDashboard />} />
           <Route path="/admin/add" element={<AddInventory />} /> 
         </Route>
 
-        {/* The Porter App is kept separate, as it's a full-screen mobile view */}
         <Route path="/porter" element={<PorterApp />} />
         
       </Routes>
