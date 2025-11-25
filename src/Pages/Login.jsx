@@ -35,10 +35,10 @@ export default function Login() {
   const demoLogin = (role) => {
     if (role === 'nurse') {
       setEmail('nurse@hospital.com');
-      setPassword('password123');
+      setPassword('Ar@180905');
     } else {
       setEmail('porter@hospital.com');
-      setPassword('password123');
+      setPassword('Ar@180905');
     }
   };
 
