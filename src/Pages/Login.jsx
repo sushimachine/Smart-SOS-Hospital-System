@@ -82,7 +82,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* --- THE HACKATHON WINNING SECTION --- */}
         <div className="mt-8 pt-6 border-t border-slate-200">
           <p className="text-xs text-center text-slate-400 uppercase tracking-wide mb-3">
             Judges / Demo Access
