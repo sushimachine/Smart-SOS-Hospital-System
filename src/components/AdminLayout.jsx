@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import { LayoutDashboard, Truck, PackagePlus, Activity } from 'lucide-react';
 
-function AdminLayout() {
+export default function AdminLayout() {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
 
@@ -53,7 +53,7 @@ function AdminLayout() {
 
       <div className="flex-1 flex flex-col min-w-0">
         
-        <Navbar userEmail="nurse@hospital.com" />
+        <Navbar />
 
         <main className="flex-1 overflow-y-auto p-8">
           <Outlet /> 
@@ -63,5 +63,3 @@ function AdminLayout() {
     </div>
   );
 }
-
-export default AdminLayout
