@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Truck, MapPin, CheckCircle, Package } from 'lucide-react';
+import { Truck, MapPin, CheckCircle, Package, ArrowRight, Play } from 'lucide-react';
 
-function PorterApp() {
+export default function PorterApp() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ function PorterApp() {
     setupRealtimeSubscription();
   }, []);
 
-  // 1. Initial Load of Pending Tasks
+  // Fetch 'pending' AND 'in_transit' tasks
   const fetchTasks = async () => {
     try {
       const { data, error } = await supabase
@@ -23,7 +23,7 @@ function PorterApp() {
           from:locations!from_location_id(name),
           to:locations!to_location_id(name)
         `)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'in_transit']) // Fetch both active states
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -35,16 +35,20 @@ function PorterApp() {
     }
   };
 
-  // 2. THE REAL-TIME LISTENER (The "Aha!" Feature)
   const setupRealtimeSubscription = () => {
     const channel = supabase
       .channel('porter-tasks')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'transactions' },
+        { event: '*', schema: 'public', table: 'transactions' }, // Listen to ALL changes (updates too)
         async (payload) => {
-          // When a new task comes in, we need to fetch its location names
-          // (Payload only has IDs, so we re-fetch this specific row)
+          // If it's an UPDATE (status change), refresh local state logic
+          if (payload.eventType === 'UPDATE' && payload.new.status === 'delivered') {
+            setTasks((prev) => prev.filter((t) => t.id !== payload.new.id));
+            return;
+          }
+
+          // If INSERT or relevant UPDATE, fetch fresh data
           const { data } = await supabase
             .from('transactions')
             .select(`
@@ -56,9 +60,14 @@ function PorterApp() {
             .single();
 
           if (data) {
-            setTasks((prev) => [data, ...prev]);
-            // Optional: Browser Sound or Vibration here
-            alert(`🚨 NEW TASK: Move ${data.drug_name}!`);
+             // If it's already in list, update it (e.g. pending -> in_transit)
+             setTasks((prev) => {
+                const exists = prev.find(t => t.id === data.id);
+                if (exists) return prev.map(t => t.id === data.id ? data : t);
+                return [data, ...prev];
+             });
+             
+             if (payload.eventType === 'INSERT') alert(`🚨 NEW TASK: Move ${data.drug_name}!`);
           }
         }
       )
@@ -69,25 +78,38 @@ function PorterApp() {
     };
   };
 
-  // 3. Complete Task Logic (Updates Inventory + Transaction)
-  const completeTask = async (task) => {
-    const confirm = window.confirm("Confirm delivery of " + task.drug_name + "?");
+  // STEP 1: PICK UP (Pending -> In Transit)
+  const startDelivery = async (task) => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: 'in_transit' })
+        .eq('id', task.id);
+
+      if (error) throw error;
+      // UI update happens automatically via Realtime, but we optimistically update for speed
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'in_transit' } : t));
+    } catch (error) {
+      alert("Error starting delivery");
+    }
+  };
+
+  // STEP 2: COMPLETE (In Transit -> Delivered)
+  const completeDelivery = async (task) => {
+    const confirm = window.confirm(`Arrived at ${task.to?.name}? Confirm delivery.`);
     if (!confirm) return;
 
     try {
-      // A. Update Transaction Status
-      const { error: txError } = await supabase
+      // A. Mark Transaction Complete
+      await supabase
         .from('transactions')
         .update({ 
-          status: 'delivered',
-          performed_by_user_id: user?.id // Audit: Porter who finished it
+          status: 'delivered', 
+          performed_by_user_id: user?.id 
         })
         .eq('id', task.id);
 
-      if (txError) throw txError;
-
-      // B. Update Inventory at Destination (The "Closing the Loop" part)
-      // Check if item already exists at destination
+      // B. Update Inventory (Add stock to destination)
       const { data: existingStock } = await supabase
         .from('inventory')
         .select('*')
@@ -96,39 +118,30 @@ function PorterApp() {
         .single();
 
       if (existingStock) {
-        // Update existing row
-        await supabase
-          .from('inventory')
-          .update({ quantity: existingStock.quantity + task.qty })
-          .eq('id', existingStock.id);
+        await supabase.from('inventory').update({ quantity: existingStock.quantity + task.qty }).eq('id', existingStock.id);
       } else {
-        // Create new row (First time this drug is in this ward)
-        await supabase
-          .from('inventory')
-          .insert({
-            drug_name: task.drug_name,
-            quantity: task.qty,
-            location_id: task.to_location_id,
-            expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)) // Default 1 year expiry
-          });
+        await supabase.from('inventory').insert({
+          drug_name: task.drug_name,
+          quantity: task.qty,
+          location_id: task.to_location_id,
+          expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1))
+        });
       }
 
-      // Remove from UI
-      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      // Remove from list
+      setTasks(prev => prev.filter(t => t.id !== task.id));
 
     } catch (error) {
       console.error('Error completing task:', error);
-      alert('Failed to complete task.');
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8 pt-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Truck className="text-amber-400" /> Logistics View
+            <Truck className="text-blue-500" /> Logistics View
           </h1>
           <p className="text-slate-400 text-sm">Real-time delivery feed</p>
         </div>
@@ -137,7 +150,6 @@ function PorterApp() {
         </div>
       </div>
 
-      {/* Task List */}
       {loading ? (
         <div className="text-center text-slate-500 mt-10">Connecting to HQ...</div>
       ) : tasks.length === 0 ? (
@@ -148,58 +160,82 @@ function PorterApp() {
         </div>
       ) : (
         <div className="space-y-4">
-          {tasks.map((task) => (
-            <div 
-              key={task.id} 
-              className="bg-slate-800 rounded-xl overflow-hidden border-l-4 border-amber-400 shadow-lg relative"
-            >
-              {/* Card Body */}
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Package size={20} className="text-slate-400" />
-                    {task.drug_name}
-                  </h3>
-                  <span className="bg-amber-400 text-black text-xs font-extrabold px-2 py-1 rounded">
-                    {task.qty} UNITS
-                  </span>
-                </div>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 min-w-[4px] h-[4px] rounded-full bg-red-500" />
-                    <div>
-                      <p className="text-slate-400 text-xs uppercase font-bold">Pick Up From</p>
-                      <p className="text-white text-lg font-medium">{task.from?.name || 'Unknown'}</p>
-                    </div>
-                  </div>
-
-                  <div className="pl-[5px] border-l border-dashed border-slate-600 h-4 ml-1.5" />
-
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 min-w-[4px] h-[4px] rounded-full bg-green-500" />
-                    <div>
-                      <p className="text-slate-400 text-xs uppercase font-bold">Deliver To</p>
-                      <p className="text-white text-lg font-medium">{task.to?.name || 'Unknown'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <button
-                onClick={() => completeTask(task)}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 transition-colors flex items-center justify-center gap-2 active:bg-amber-600"
+          {tasks.map((task) => {
+            const isInTransit = task.status === 'in_transit';
+            
+            return (
+              <div 
+                key={task.id} 
+                className={`rounded-xl overflow-hidden border-l-4 shadow-lg relative transition-all duration-300
+                  ${isInTransit ? 'bg-slate-800 border-blue-500' : 'bg-slate-800 border-amber-400'}`}
               >
-                <CheckCircle size={20} />
-                SWIPE TO CONFIRM DELIVERY
-              </button>
-            </div>
-          ))}
+                {/* Header Badge */}
+                <div className={`px-4 py-1 text-xs font-bold text-black uppercase flex justify-between items-center
+                  ${isInTransit ? 'bg-blue-500' : 'bg-amber-400'}`}>
+                  <span>{isInTransit ? '🚀 ON THE WAY' : '⚠️ NEW REQUEST'}</span>
+                  <span>{new Date(task.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Package size={20} className="text-slate-400" />
+                      {task.drug_name}
+                    </h3>
+                    <span className="bg-slate-700 text-white text-xs font-extrabold px-2 py-1 rounded border border-slate-600">
+                      {task.qty} UNITS
+                    </span>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    {/* FROM */}
+                    <div className={`flex items-center gap-3 p-2 rounded-lg ${isInTransit ? 'opacity-50' : 'bg-slate-700/50'}`}>
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                      <div>
+                        <p className="text-slate-400 text-xs uppercase font-bold">Pick Up</p>
+                        <p className="text-white font-medium">{task.from?.name}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Arrow Visual */}
+                    <div className="flex justify-center -my-2 opacity-30">
+                      <ArrowRight className="rotate-90" size={16} />
+                    </div>
+
+                    {/* TO */}
+                    <div className={`flex items-center gap-3 p-2 rounded-lg ${isInTransit ? 'bg-blue-900/30 border border-blue-500/30' : 'opacity-50'}`}>
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div>
+                        <p className="text-slate-400 text-xs uppercase font-bold">Drop Off</p>
+                        <p className="text-white font-medium">{task.to?.name}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* THE DYNAMIC BUTTON */}
+                {isInTransit ? (
+                  <button
+                    onClick={() => completeDelivery(task)}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={20} />
+                    CONFIRM ARRIVAL (DELIVERED)
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => startDelivery(task)}
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Play size={20} fill="black" />
+                    ACCEPT & START DELIVERY
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
-
-export default PorterApp

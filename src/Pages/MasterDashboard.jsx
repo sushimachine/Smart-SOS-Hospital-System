@@ -21,7 +21,7 @@ function MasterDashboard() {
       
       const totalStock = inventory?.reduce((acc, item) => acc + item.quantity, 0) || 0;
       const lowStockCount = inventory?.filter(item => item.quantity < 10).length || 0;
-      const totalValue = totalStock * 125; // Fake "Value" calculation (₹125 per unit avg)
+      const totalValue = totalStock * 125; 
 
       setStats({ totalStock, lowStockCount, totalValue });
 
@@ -33,7 +33,7 @@ function MasterDashboard() {
           to:locations!to_location_id(name)
         `)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10); 
 
       setRecentActivity(transactions || []);
     } catch (error) {
@@ -119,18 +119,26 @@ function MasterDashboard() {
                 <td className="px-6 py-4 text-slate-600">
                   {tx.from?.name} <span className="text-slate-300 mx-2">→</span> {tx.to?.name}
                 </td>
+                
                 <td className="px-6 py-4">
-                  {tx.status === 'pending' ? (
+                  {tx.status === 'pending' && (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      IN TRANSIT
+                      WAITING
                     </span>
-                  ) : (
+                  )}
+                  {tx.status === 'in_transit' && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                      ON THE WAY
+                    </span>
+                  )}
+                  {tx.status === 'delivered' && (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
                       DELIVERED
                     </span>
                   )}
                 </td>
+
                 <td className="px-6 py-4 text-slate-400">
                   {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </td>
@@ -143,4 +151,4 @@ function MasterDashboard() {
   );
 }
 
-export default MasterDashboard
+export default MasterDashboard;
