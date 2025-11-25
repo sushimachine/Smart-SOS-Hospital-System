@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../context/AuthContext'; // For Audit Trail
+import { useAuth } from '../context/AuthContext'; 
 import { PackagePlus, Save, CheckCircle } from 'lucide-react';
 
 function AddInventory() {
@@ -9,7 +9,6 @@ function AddInventory() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState({
     drug_name: '',
     quantity: '',
@@ -21,18 +20,15 @@ function AddInventory() {
     fetchLocations();
   }, []);
 
-  // 1. Fetch Locations for the Dropdown
   const fetchLocations = async () => {
     const { data } = await supabase.from('locations').select('*');
     setLocations(data || []);
   };
 
-  // 2. Handle Input Changes
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 3. Submit Data to Supabase
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -44,17 +40,14 @@ function AddInventory() {
           quantity: parseInt(formData.quantity),
           location_id: parseInt(formData.location_id),
           expiry_date: formData.expiry_date,
-          // Audit Trail (Optional: You can add last_updated_by if column exists)
-          // last_updated_by_user_id: user?.id 
         }
       ]);
 
       if (error) throw error;
 
-      // Success Feedback
       setSuccess(true);
-      setFormData({ drug_name: '', quantity: '', location_id: '', expiry_date: '' }); // Reset form
-      setTimeout(() => setSuccess(false), 3000); // Hide success after 3s
+      setFormData({ drug_name: '', quantity: '', location_id: '', expiry_date: '' }); 
+      setTimeout(() => setSuccess(false), 3000); 
 
     } catch (error) {
       console.error('Error adding stock:', error);
@@ -66,7 +59,6 @@ function AddInventory() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <PackagePlus className="text-blue-600" />
@@ -75,7 +67,6 @@ function AddInventory() {
         <p className="text-slate-500">Register new incoming medicine batches.</p>
       </div>
 
-      {/* Success Notification */}
       {success && (
         <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2 animate-pulse">
           <CheckCircle size={20} />
@@ -83,11 +74,9 @@ function AddInventory() {
         </div>
       )}
 
-      {/* The Form */}
       <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Drug Name */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Drug / Medicine Name</label>
             <input
@@ -102,7 +91,6 @@ function AddInventory() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Quantity */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Quantity (Units)</label>
               <input
@@ -116,7 +104,6 @@ function AddInventory() {
               />
             </div>
 
-            {/* Expiry Date */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">Expiry Date</label>
               <input
@@ -130,7 +117,6 @@ function AddInventory() {
             </div>
           </div>
 
-          {/* Location Dropdown */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Storage Location</label>
             <div className="relative">
@@ -148,14 +134,12 @@ function AddInventory() {
                   </option>
                 ))}
               </select>
-              {/* Custom Arrow Icon */}
               <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-500">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </div>
             </div>
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}

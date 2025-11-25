@@ -88,11 +88,6 @@ export default function AdminLayout() {
           <NavItem to="/admin/logistics" icon={Truck} label="Logistics View" />
         </div>
 
-        {isSidebarOpen && (
-          <div className="p-4 border-t border-slate-800 text-xs text-slate-600 text-center whitespace-nowrap overflow-hidden">
-            v1.0 Hackathon Build
-          </div>
-        )}
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">

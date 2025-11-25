@@ -8,7 +8,6 @@ function PorterApp() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // CHECK ROLE: Is the viewer actually a porter?
   const isPorter = user?.email?.includes('porter');
 
   useEffect(() => {
@@ -66,7 +65,6 @@ function PorterApp() {
                 return [data, ...prev];
              });
              
-             // Only alert if it's a new task AND user is a porter
              if (payload.eventType === 'INSERT' && isPorter) {
                 alert(`🚨 NEW TASK: Move ${data.drug_name}!`);
              }
@@ -83,7 +81,6 @@ function PorterApp() {
   const startDelivery = async (task) => {
     try {
       await supabase.from('transactions').update({ status: 'in_transit' }).eq('id', task.id);
-      // Optimistic update
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'in_transit' } : t));
     } catch (error) {
       alert("Error starting delivery");
@@ -94,12 +91,10 @@ function PorterApp() {
     if (!window.confirm(`Confirm delivery of ${task.drug_name}?`)) return;
 
     try {
-      // 1. Mark Delivered
       await supabase.from('transactions')
         .update({ status: 'delivered', performed_by_user_id: user?.id })
         .eq('id', task.id);
 
-      // 2. Update Inventory Logic
       const { data: existingStock } = await supabase
         .from('inventory')
         .select('*')
@@ -167,7 +162,6 @@ function PorterApp() {
                 className={`rounded-xl overflow-hidden border-l-4 shadow-lg relative transition-all duration-300
                   ${isInTransit ? 'bg-slate-800 border-blue-500' : 'bg-slate-800 border-amber-400'}`}
               >
-                {/* Header Badge */}
                 <div className={`px-4 py-1 text-xs font-bold text-black uppercase flex justify-between items-center
                   ${isInTransit ? 'bg-blue-500' : 'bg-amber-400'}`}>
                   <span>{isInTransit ? '🚀 ON THE WAY' : '⚠️ REQUEST PENDING'}</span>
@@ -186,7 +180,6 @@ function PorterApp() {
                   </div>
 
                   <div className="space-y-4 text-sm">
-                    {/* FROM */}
                     <div className={`flex items-center gap-3 p-2 rounded-lg ${isInTransit ? 'opacity-50' : 'bg-slate-700/50'}`}>
                       <div className="w-2 h-2 rounded-full bg-red-500" />
                       <div>
@@ -199,7 +192,6 @@ function PorterApp() {
                       <ArrowRight className="rotate-90" size={16} />
                     </div>
 
-                    {/* TO */}
                     <div className={`flex items-center gap-3 p-2 rounded-lg ${isInTransit ? 'bg-blue-900/30 border border-blue-500/30' : 'opacity-50'}`}>
                       <div className="w-2 h-2 rounded-full bg-green-500" />
                       <div>
@@ -210,9 +202,7 @@ function PorterApp() {
                   </div>
                 </div>
 
-                {/* --- ROLE BASED BUTTON RENDER --- */}
                 {isPorter ? (
-                  // IF PORTER: Show Action Buttons
                   isInTransit ? (
                     <button
                       onClick={() => completeDelivery(task)}
@@ -231,7 +221,6 @@ function PorterApp() {
                     </button>
                   )
                 ) : (
-                  // IF NURSE/ADMIN: Show Status Text Only
                   <div className="w-full bg-slate-900/50 py-4 flex items-center justify-center gap-2 text-slate-400 border-t border-slate-700 font-medium">
                     {isInTransit ? (
                       <>

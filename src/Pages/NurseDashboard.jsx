@@ -8,16 +8,14 @@ function NurseDashboard() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modal & Request State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [requestDrug, setRequestDrug] = useState('');
-  const [requestQty, setRequestQty] = useState(10); // Default qty
+  const [requestQty, setRequestQty] = useState(10); 
   
-  // The "Visual" Process State (0 = Form, 1 = Searching, 2 = Found/Done, 3 = Error)
   const [processStep, setProcessStep] = useState(0); 
-  const [algoResult, setAlgoResult] = useState(null); // Stores where we found it
+  const [algoResult, setAlgoResult] = useState(null); 
 
-  const MY_WARD_ID = 2; // Hardcoded ICU
+  const MY_WARD_ID = 2; 
 
   useEffect(() => {
     fetchInventory();
@@ -45,32 +43,27 @@ function NurseDashboard() {
     setAlgoResult(null);
   };
 
-  // --- THE PROFESSIONAL ALGORITHM ---
   const runSmartAlgorithm = async () => {
     if (!requestDrug || !requestQty) return;
-    setProcessStep(1); // Start "Scanning" animation
+    setProcessStep(1); 
 
     try {
-      // Step 1: Artificial Delay for "Scanning" visual
       await new Promise(r => setTimeout(r, 800));
 
-      // Query Global Stock
       const { data: globalStock } = await supabase
         .from('inventory')
         .select(`*, locations(name, type)`)
         .eq('drug_name', requestDrug)
         .gt('quantity', 0);
 
-      // Step 2: Artificial Delay for "Analyzing" visual
       await new Promise(r => setTimeout(r, 800));
 
       if (!globalStock || globalStock.length === 0) {
         setAlgoResult({ error: "Drug unavailable in entire hospital network." });
-        setProcessStep(3); // Error State
+        setProcessStep(3); 
         return;
       }
 
-      // Logic: Warehouse First -> Then Surplus Wards
       let bestSource = null;
       let sourceName = '';
       let sourceType = '';
@@ -82,7 +75,6 @@ function NurseDashboard() {
         sourceName = warehouse.locations.name;
         sourceType = 'Central Supply';
       } else {
-        // Warehouse empty or insufficient? Find richest ward
         const richestWard = globalStock
           .filter(item => item.location_id !== MY_WARD_ID && item.quantity >= requestQty)
           .sort((a, b) => b.quantity - a.quantity)[0];
@@ -98,7 +90,6 @@ function NurseDashboard() {
         }
       }
 
-      // Step 3: Execute
       const { error } = await supabase.from('transactions').insert({
         drug_name: requestDrug,
         qty: requestQty,
@@ -110,10 +101,9 @@ function NurseDashboard() {
 
       if (error) throw error;
 
-      // Success State
       setAlgoResult({ source: sourceName, type: sourceType });
-      setProcessStep(2); // Done State
-      fetchInventory(); // Refresh table behind modal
+      setProcessStep(2); 
+      fetchInventory(); 
 
     } catch (error) {
       console.error(error);
@@ -124,7 +114,6 @@ function NurseDashboard() {
 
   return (
     <div className="space-y-6 relative">
-      {/* Header */}
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">ICU Ward Inventory</h2>
@@ -140,7 +129,6 @@ function NurseDashboard() {
         </button>
       </div>
 
-      {/* Main Inventory Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
@@ -186,12 +174,10 @@ function NurseDashboard() {
         </table>
       </div>
 
-      {/* --- PROFESSIONAL REQUEST MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             
-            {/* Modal Header */}
             <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-bold text-lg text-slate-800">Request Stock</h3>
               <button onClick={resetModal} className="text-slate-400 hover:text-slate-600">
@@ -199,10 +185,8 @@ function NurseDashboard() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6">
               
-              {/* STEP 0: THE FORM */}
               {processStep === 0 && (
                 <div className="space-y-4">
                   <div>
@@ -240,7 +224,6 @@ function NurseDashboard() {
                 </div>
               )}
 
-              {/* STEP 1: PROCESSING VISUAL (The "Smart" part) */}
               {processStep === 1 && (
                 <div className="py-8 text-center space-y-4">
                   <div className="relative w-16 h-16 mx-auto">
@@ -252,7 +235,6 @@ function NurseDashboard() {
                     <p className="text-sm text-slate-500">Scanning warehouse and surplus wards</p>
                   </div>
                   
-                  {/* The Checklist Visual */}
                   <div className="max-w-[200px] mx-auto text-left space-y-2 mt-4 text-sm text-slate-600">
                     <div className="flex items-center gap-2">
                        <CheckCircle size={16} className="text-green-500" /> Database Connection
@@ -264,7 +246,6 @@ function NurseDashboard() {
                 </div>
               )}
 
-              {/* STEP 2: SUCCESS RESULT */}
               {processStep === 2 && (
                 <div className="py-4 text-center">
                   <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
@@ -290,7 +271,6 @@ function NurseDashboard() {
                 </div>
               )}
 
-              {/* STEP 3: FAILURE */}
               {processStep === 3 && (
                 <div className="py-4 text-center">
                   <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
