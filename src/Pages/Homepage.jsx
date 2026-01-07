@@ -71,7 +71,7 @@ function Homepage() {
         </div>
       </nav>
 
-      <div className="bg-white border-b border-slate-200 pb-16 pt-16 px-4 text-center">
+      <div className="bg-white dark:bg-[#33373E] border-b border-slate-200 pb-16 pt-16 px-4 text-center">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
             Hospital Supply Chain <span className="text-blue-600">OS</span>
@@ -83,7 +83,7 @@ function Homepage() {
 
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
           
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-colors">
+          <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-colors">
             <div className="text-left">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Deliveries</p>
               <p className="text-3xl font-bold text-slate-800 mt-1">
@@ -95,7 +95,7 @@ function Homepage() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-red-300 transition-colors">
+          <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-red-300 transition-colors">
             <div className="text-left">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Critical Shortages</p>
               <p className={`text-3xl font-bold mt-1 ${stats.criticalLow > 0 ? 'text-red-600' : 'text-slate-800'}`}>
@@ -107,7 +107,7 @@ function Homepage() {
             </div>
           </div>
 
-           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-colors">
+           <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 transition-colors">
             <div className="text-left">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Units Tracked</p>
               <p className="text-3xl font-bold text-blue-600 mt-1">
@@ -129,7 +129,7 @@ function Homepage() {
           <div className="grid md:grid-cols-2 gap-6">
             <button 
               onClick={() => navigate('/login')}
-              className="group bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden"
+              className="group bg-white dark:bg-[#33373E] p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all duration-300 text-left relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150" />
               

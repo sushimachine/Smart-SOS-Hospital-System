@@ -53,7 +53,7 @@ function MasterDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-slate-500 text-sm font-medium uppercase">Total Inventory</p>
@@ -68,7 +68,7 @@ function MasterDashboard() {
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-slate-500 text-sm font-medium uppercase">Est. Stock Value</p>
@@ -81,7 +81,7 @@ function MasterDashboard() {
           <p className="text-xs text-slate-400">Updated in real-time</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-[#33373E] p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-slate-500 text-sm font-medium uppercase">Critical Alerts</p>
@@ -99,7 +99,7 @@ function MasterDashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white dark:bg-[#33373E] rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <h3 className="font-bold text-lg text-slate-800">Recent Supply Chain Activity</h3>
         </div>

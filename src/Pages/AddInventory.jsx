@@ -74,7 +74,7 @@ function AddInventory() {
         </div>
       )}
 
-      <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+      <div className="bg-white dark:bg-[#33373E] p-8 rounded-xl border border-slate-200 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-6">
           
           <div>

@@ -12,7 +12,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+    <nav className="h-16 bg-white dark:bg-[#33373E] border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
       <div className="text-slate-500 text-sm font-medium">
         Hospital Supply Chain <span className="text-slate-300 mx-2">/</span> <span className="text-blue-600">Overview</span>
       </div>
